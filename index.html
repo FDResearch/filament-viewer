@@ -26,6 +26,7 @@
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
+body { height: 100dvh; }
 body {
   background: var(--bg); color: var(--text);
   font: 13px/1.4 "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -70,7 +71,8 @@ aside h3 {
   font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted);
   margin: 16px 0 6px; display: flex; justify-content: space-between; align-items: center; font-weight: 600;
 }
-aside h3:first-child { margin-top: 2px; }
+aside > h3:first-of-type { margin-top: 2px; }
+.mobile-only { display: none !important; }
 aside h3 button { background: none; border: 0; color: var(--accent); cursor: pointer; font-size: 11px; padding: 0; text-transform: none; letter-spacing: 0; }
 aside input[type=search] { width: 100%; }
 .chips { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -113,7 +115,13 @@ input[type=checkbox] { accent-color: var(--accent); }
 .view.on { display: flex; flex-direction: column; }
 
 /* table */
-.table-wrap { flex: 1; overflow: auto; position: relative; }
+.table-wrap { flex: 1; overflow: auto; position: relative; touch-action: pan-x pan-y; overscroll-behavior: contain; }
+.zoom { display: flex; align-items: center; gap: 2px; }
+.zoom button { width: 28px; padding: 4px 0; text-align: center; }
+.zoom span { min-width: 44px; text-align: center; color: var(--muted); cursor: pointer; font-size: 12px; }
+.view.on { overflow-y: auto; }
+.badge { background: var(--accent); color: #fff; border-radius: 999px; padding: 0 6px; font-size: 11px; margin-left: 4px; }
+.badge:empty { display: none; }
 table { border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; }
 th, td {
   padding: 4px 9px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line);
@@ -154,8 +162,8 @@ td .day { color: var(--dim); font-size: 11px; margin-left: 3px; }
 
 /* popover */
 .pop {
-  position: absolute; z-index: 20; background: var(--panel); border: 1px solid var(--line2); border-radius: 8px;
-  box-shadow: 0 10px 30px rgba(0,0,0,.5); padding: 10px; max-height: 70vh; overflow-y: auto; width: 320px; display: none;
+  position: fixed; z-index: 20; background: var(--panel); border: 1px solid var(--line2); border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.5); padding: 10px; max-height: 70vh; overflow-y: auto; width: min(320px, calc(100vw - 16px)); display: none;
 }
 .pop.on { display: block; }
 .pop label { display: flex; gap: 6px; align-items: center; padding: 2px 0; }
@@ -175,15 +183,58 @@ td .day { color: var(--dim); font-size: 11px; margin-left: 3px; }
 .drop-card p { color: var(--muted); margin: 6px 0 18px; }
 .err { color: #ff8a9a; margin-top: 10px; }
 
+/* phones: filters in a drawer, compact header, the table pinch-zoomable */
+#scrim { display: none; }
 @media (max-width: 760px) {
-  main { flex-direction: column; }
-  aside { width: auto; max-height: 40vh; border-right: 0; border-bottom: 1px solid var(--line); }
-  header { flex-wrap: wrap; }
+  .mobile-only { display: revert !important; }
+  .desktop-only { display: none !important; }
+  header { flex-wrap: wrap; gap: 8px; padding: 8px 10px; }
+  header h1 { font-size: 14px; }
+  .file-name { display: none; }
+  #sheetSel { flex: 1; min-width: 0; }
+  .tabs { order: 10; width: 100%; }
+  .tabs button { flex: 1; padding: 7px 0; }
+  .spacer { display: none; }
+  aside {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 40; width: min(88vw, 340px);
+    transform: translateX(-102%); transition: transform .22s ease; box-shadow: 0 0 40px rgba(0,0,0,.6);
+    padding-bottom: 40px;
+  }
+  body.filters-open aside { transform: none; }
+  body.filters-open #scrim { display: block; position: fixed; inset: 0; z-index: 39; background: rgba(0,0,0,.5); }
+  .drawer-head {
+    display: flex !important; justify-content: space-between; align-items: center;
+    position: sticky; top: -10px; margin: -10px -12px 8px; padding: 10px 12px; background: var(--panel);
+    border-bottom: 1px solid var(--line); z-index: 1; font-size: 15px;
+  }
+  .facet-list { max-height: 34vh; }
+  .facet-list label { padding: 7px 8px; }
+  .chip { padding: 5px 11px; font-size: 13px; }
+  input[type=search], select { font-size: 16px; } /* no auto-zoom on focus in iOS */
+  .toolbar { padding: 6px 10px; gap: 6px; flex-wrap: nowrap; }
+  .toolbar .count { font-size: 12px; white-space: nowrap; }
+  .toolbar .spacer { display: block; }
+  .info { padding: 5px 10px 0; margin-bottom: 4px; font-size: 11.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+  .info.open { display: block; padding-bottom: 5px; margin-bottom: 0; }
+  th.mat, td.mat { min-width: 130px; max-width: 150px; }
+  td.mat { white-space: normal; line-height: 1.2; padding-top: 3px; padding-bottom: 3px; }
+  td.mat .brand { display: block; font-size: 11px; }
+  td.mat .pin { float: left; margin-top: 6px; }
+  td.mat .color { display: none; }
+  .chart-controls { padding: 6px 10px; gap: 8px; }
+  .chart-controls label { flex: 1 1 100%; }
+  .chart-controls label select { flex: 1; min-width: 0; }
+  .chart-box { padding: 6px 4px 8px; min-height: 360px; }
+  .drop-card { padding: 30px 22px; margin: 0 14px; }
+}
+@media (max-width: 440px) {
+  header h1 { display: none; }
 }
 </style>
 </head>
 <body>
 <header>
+  <button class="btn mobile-only" id="filtersBtn">☰ Filters<span class="badge" id="fcount"></span></button>
   <h1>Filament <span>Viewer</span></h1>
   <span class="file-name" id="fileName"></span>
   <select id="sheetSel" title="Sheet"></select>
@@ -194,13 +245,15 @@ td .day { color: var(--dim); font-size: 11px; margin-left: 3px; }
     <button data-view="radar">Radar</button>
   </div>
   <div class="spacer"></div>
-  <button class="btn" id="csvBtn" title="The rows and columns shown, with the computed creep">Export CSV</button>
-  <button class="btn" id="openBtn">Open .xlsx…</button>
+  <button class="btn desktop-only" id="csvBtn" title="The rows and columns shown, with the computed creep">Export CSV</button>
+  <button class="btn" id="openBtn" title="Open the MyTechFun .xlsx">Open…</button>
   <input type="file" id="fileInput" accept=".xlsx,.xls" hidden>
 </header>
 
 <main>
+  <div id="scrim"></div>
   <aside id="side">
+    <div class="drawer-head mobile-only"><b>Filters</b><span><span class="count" id="dcount"></span> <button class="btn primary" id="filtersDone">Show</button></span></div>
     <h3>Search <button id="clearAll">clear all filters</button></h3>
     <input type="search" id="q" placeholder="Any text: brand, type, colour…">
 
@@ -243,8 +296,9 @@ td .day { color: var(--dim); font-size: 11px; margin-left: 3px; }
     <div class="toolbar">
       <span class="count" id="count"></span>
       <div class="spacer"></div>
-      <label class="row" title="Shade each number by its rank in its column (purple = better)"><input type="checkbox" id="heat" checked> heatmap</label>
-      <button class="btn" id="colsBtn">Columns…</button>
+      <span class="zoom" id="zoomBox" title="Table zoom (pinch, or Ctrl + wheel)"><button class="btn" data-z="-">−</button><span data-z="1" id="zoomPct">100%</span><button class="btn" data-z="+">+</button></span>
+      <label class="row" title="Shade each number by its rank in its column (purple = better)"><input type="checkbox" id="heat" checked> <span class="desktop-only">heatmap</span><span class="mobile-only">heat</span></label>
+      <button class="btn" id="colsBtn"><span class="desktop-only">Columns…</span><span class="mobile-only">Cols</span></button>
     </div>
     <div class="info" id="creepInfo"></div>
 
@@ -485,7 +539,7 @@ const state = Object.assign({
   creepMode: "common", creepNeed: "any",
   pins: [], pinnedOnly: false, heat: true,
   sort: null, hidden: {}, sx: null, sy: null, sc: "base", strend: true,
-  bm: null, bg: "base", bn: 40, radarCols: null,
+  bm: null, bg: "base", bn: 40, radarCols: null, zoom: null,
 }, store.get("state", {}));
 const facetQ = { brand: "", type: "" };
 const save = () => store.set("state", state);
@@ -642,6 +696,7 @@ function renderTable(rows) {
   h += `</tbody></table>`;
   const wrap = $("#tableWrap"), sx = wrap.scrollLeft, sy = wrap.scrollTop;
   wrap.innerHTML = h;
+  wrap.querySelector("table").style.zoom = tableZoom();
   wrap.scrollLeft = sx; wrap.scrollTop = sy;
 }
 
@@ -651,6 +706,7 @@ Chart.defaults.borderColor = "#34343d";
 Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
 const PALETTE = ["#a37bff", "#5ec8e5", "#f07fb8", "#f0b86e", "#7fd6a4", "#e86a5c", "#c9d36a", "#7f9cff", "#d79bff", "#4fb3a0", "#ff9f6e", "#b0aec0"];
 const charts = {};
+const narrow = () => matchMedia("(max-width: 760px)").matches;
 function chart(id, cfg) { if (charts[id]) charts[id].destroy(); charts[id] = new Chart($("#" + id), cfg); return charts[id]; }
 // chart values: percent columns as percent, not as a fraction
 const cv = (r, c) => isNum(r[c.key]) ? (c.pct ? r[c.key] * 100 : r[c.key]) : null;
@@ -733,7 +789,7 @@ function renderScatter(rows) {
       maintainAspectRatio: false, animation: false,
       scales: { x: gridScale(axisLabel(cx)), y: gridScale(axisLabel(cy)) },
       plugins: {
-        legend: { position: "right", labels: { boxWidth: 10, filter: i => i.text !== "trend" } },
+        legend: { position: narrow() ? "bottom" : "right", labels: { boxWidth: 10, filter: i => i.text !== "trend" } },
         tooltip: { ...tooltipBase, filter: i => i.raw && i.raw.r, callbacks: {
           title: items => items.map(i => i.raw.r._name + (i.raw.r._color ? " · " + i.raw.r._color : "")),
           label: i => `${cx.label}: ${cfmt(i.raw.x, cx)}   ${cy.label}: ${cfmt(i.raw.y, cy)}`,
@@ -782,7 +838,7 @@ function renderBars(rows) {
   const datasets = [{ label: c.label, data: values, backgroundColor: colors.map(x => x + "bb"), borderColor: colors, borderWidth: 1, barPercentage: .85 }];
   if (state.bg !== "none") datasets.push({ type: "bar", label: "range", data: extra.map(x => [x.min, x.max]), backgroundColor: "#e7e5ee33", borderColor: "#e7e5ee66", borderWidth: 1, barPercentage: .18, grouped: false });
   const box = $("#cBars").parentElement;
-  box.style.height = ""; // the canvas grows with the number of bars
+  box.style.minHeight = labels.length * (narrow() ? 22 : 20) + 90 + "px"; // room for every bar; the view scrolls
   chart("cBars", {
     type: "bar", data: { labels, datasets },
     options: {
@@ -831,7 +887,7 @@ function renderRadar(rows) {
     options: {
       maintainAspectRatio: false, animation: false,
       scales: { r: { min: 0, max: 1, ticks: { display: false, stepSize: .25 }, grid: { color: "#34343d" }, angleLines: { color: "#34343d" }, pointLabels: { color: "#cdb8ff", font: { size: 12 } } } },
-      plugins: { legend: { position: "right" }, tooltip: { ...tooltipBase, callbacks: {
+      plugins: { legend: { position: narrow() ? "bottom" : "right" }, tooltip: { ...tooltipBase, callbacks: {
         label: i => `${i.dataset.label}: ${fmt(i.dataset.raw[i.dataIndex], cols[i.dataIndex])} (rank ${Math.round((i.raw ?? 0) * 100)} %)`,
       } } },
     },
@@ -845,7 +901,7 @@ function openPop(pop, anchor, html, onChange) {
     pop.innerHTML = html;
     const r = anchor.getBoundingClientRect();
     pop.style.top = r.bottom + 6 + "px";
-    pop.style.left = Math.max(8, Math.min(innerWidth - 330, r.right - 320)) + "px";
+    pop.style.left = Math.max(8, Math.min(innerWidth - pop.offsetWidth - 8, r.right - pop.offsetWidth)) + "px";
     pop.onchange = onChange;
   }
 }
@@ -891,6 +947,58 @@ document.addEventListener("mousedown", e => {
   if (!e.target.closest(".pop") && !e.target.closest("#colsBtn") && !e.target.closest("#radarCols")) $$(".pop").forEach(p => p.classList.remove("on"));
 });
 
+/* ---------- table zoom: pinch, Ctrl + wheel (trackpad pinch), or the − / + buttons ---------- */
+const tableZoom = () => state.zoom ?? (narrow() ? 0.8 : 1);
+function applyZoom(z, ax, ay) {
+  const wrap = $("#tableWrap"), t = wrap.querySelector("table");
+  z = Math.min(2.5, Math.max(0.35, z));
+  const old = tableZoom();
+  if (ax == null) { ax = wrap.clientWidth / 2; ay = wrap.clientHeight / 2; }
+  // keep the point under the fingers where it is
+  const cx = (wrap.scrollLeft + ax) / old, cy = (wrap.scrollTop + ay) / old;
+  state.zoom = z;
+  if (t) t.style.zoom = z;
+  wrap.scrollLeft = cx * z - ax; wrap.scrollTop = cy * z - ay;
+  $("#zoomPct").textContent = Math.round(z * 100) + "%";
+}
+(() => {
+  const wrap = $("#tableWrap");
+  let p = null, frame = 0, saveT = 0;
+  const later = () => { clearTimeout(saveT); saveT = setTimeout(save, 300); };
+  const dist = e => Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+  wrap.addEventListener("touchstart", e => { if (e.touches.length === 2) p = { d: dist(e), z: tableZoom() }; }, { passive: true });
+  wrap.addEventListener("touchmove", e => {
+    if (!p || e.touches.length !== 2) return;
+    e.preventDefault();
+    const r = wrap.getBoundingClientRect(), d = dist(e);
+    const x = (e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left, y = (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top;
+    cancelAnimationFrame(frame);
+    const z = p.z * d / p.d; // p is gone by the frame if the fingers lifted
+    frame = requestAnimationFrame(() => applyZoom(z, x, y));
+  }, { passive: false });
+  wrap.addEventListener("touchend", e => { if (p && e.touches.length < 2) { p = null; later(); } });
+  wrap.addEventListener("wheel", e => {
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    const r = wrap.getBoundingClientRect();
+    applyZoom(tableZoom() * Math.exp(-e.deltaY / 250), e.clientX - r.left, e.clientY - r.top);
+    later();
+  }, { passive: false });
+  $("#zoomBox").onclick = e => {
+    const z = e.target.closest("[data-z]");
+    if (!z) return;
+    applyZoom(z.dataset.z === "+" ? tableZoom() * 1.2 : z.dataset.z === "-" ? tableZoom() / 1.2 : 1);
+    save();
+  };
+})();
+
+/* ---------- filter drawer (phones) ---------- */
+const drawer = open => document.body.classList.toggle("filters-open", open);
+$("#filtersBtn").onclick = () => drawer(true);
+$("#filtersDone").onclick = () => drawer(false);
+$("#creepInfo").onclick = e => { if (!e.target.closest("a")) e.currentTarget.classList.toggle("open"); };
+$("#scrim").onclick = () => drawer(false);
+
 /* ---------- main render ---------- */
 function togglePin(id) {
   const i = state.pins.indexOf(id);
@@ -906,6 +1014,12 @@ function render() {
   renderFacets();
   const pinned = state.pins.filter(id => sheet.rows.some(r => r._id === id)).length;
   $("#count").innerHTML = `<b>${rows.length}</b> of ${sheet.rows.length} rows` + (pinned ? ` · <b>${pinned}</b> pinned` : "");
+  $("#dcount").innerHTML = `<b>${rows.length}</b> rows`;
+  const nf = (state.q ? 1 : 0) + state.base.length + state.fibers.length + state.brand.length + state.type.length +
+    (state.creepNeed !== "any" ? 1 : 0) + (state.pinnedOnly ? 1 : 0);
+  $("#fcount").textContent = nf || "";
+  $("#zoomBox").style.visibility = state.view === "table" ? "" : "hidden";
+  $("#zoomPct").textContent = Math.round(tableZoom() * 100) + "%";
   const info = $("#creepInfo");
   if (sheet.creepCols.length) {
     const cs = creepState;

@@ -17,4 +17,6 @@ every row shown has data for: day 1 across the whole sheet, day 5 once filtered 
 day-5 data ("Rows" under Creep). "Each row's own last day" uses every row's last day instead
 (the day is printed beside it; mixed horizons don't compare fairly).
 
+**On a phone:** ☰ Filters opens the filters as a drawer; pinch the table to zoom (or − / +), drag to scroll both ways. On a computer, Ctrl + wheel or a trackpad pinch zooms the table.
+
 Claude reads the same sheet with `uv run tools/filaments.py` (same parsing and creep).
