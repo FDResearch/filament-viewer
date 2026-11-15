@@ -1,0 +1,1062 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Filament Viewer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #17171b;
+  --panel: #202026;
+  --panel2: #26262d;
+  --line: #34343d;
+  --line2: #44444f;
+  --text: #e7e5ee;
+  --muted: #9b98a8;
+  --dim: #6c6979;
+  --accent: #a37bff;
+  --accent2: #7c4dff;
+  --accent-bg: rgba(163, 123, 255, 0.14);
+  --accent-bg2: rgba(163, 123, 255, 0.28);
+  --good: #7fd6a4;
+  --warn: #f0b86e;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font: 13px/1.4 "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+button, input, select { font: inherit; color: inherit; }
+a { color: var(--accent); }
+
+/* header */
+header {
+  display: flex; align-items: center; gap: 14px; padding: 8px 14px;
+  background: var(--panel); border-bottom: 1px solid var(--line); flex: none;
+}
+header h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: .2px; white-space: nowrap; }
+header h1 span { color: var(--accent); }
+.file-name { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 28ch; }
+.tabs { display: flex; gap: 2px; background: var(--bg); padding: 3px; border-radius: 8px; }
+.tabs button {
+  background: none; border: 0; padding: 5px 12px; border-radius: 6px; cursor: pointer; color: var(--muted);
+}
+.tabs button.on { background: var(--accent2); color: #fff; }
+.tabs button:not(.on):hover { color: var(--text); background: var(--panel2); }
+.spacer { flex: 1; }
+.btn {
+  background: var(--panel2); border: 1px solid var(--line2); border-radius: 6px;
+  padding: 5px 10px; cursor: pointer; white-space: nowrap;
+}
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+select, input[type=text], input[type=search], input[type=number] {
+  background: var(--bg); border: 1px solid var(--line2); border-radius: 6px; padding: 5px 8px; outline: none;
+}
+select:focus, input:focus { border-color: var(--accent); }
+
+/* layout */
+main { flex: 1; display: flex; min-height: 0; }
+aside {
+  width: 270px; flex: none; background: var(--panel); border-right: 1px solid var(--line);
+  overflow-y: auto; padding: 10px 12px 20px;
+}
+aside h3 {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted);
+  margin: 16px 0 6px; display: flex; justify-content: space-between; align-items: center; font-weight: 600;
+}
+aside h3:first-child { margin-top: 2px; }
+aside h3 button { background: none; border: 0; color: var(--accent); cursor: pointer; font-size: 11px; padding: 0; text-transform: none; letter-spacing: 0; }
+aside input[type=search] { width: 100%; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip {
+  border: 1px solid var(--line2); background: var(--panel2); border-radius: 999px;
+  padding: 2px 9px; cursor: pointer; font-size: 12px; user-select: none;
+}
+.chip small { color: var(--dim); margin-left: 3px; }
+.chip.on { background: var(--accent-bg2); border-color: var(--accent); }
+.chip.zero { opacity: .4; }
+.facet-list {
+  max-height: 210px; overflow-y: auto; margin-top: 5px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--bg);
+}
+.facet-list label {
+  display: flex; align-items: center; gap: 6px; padding: 3px 8px; cursor: pointer; white-space: nowrap;
+}
+.facet-list label:hover { background: var(--panel2); }
+.facet-list label span { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.facet-list label small { color: var(--dim); }
+.facet-list label.zero { opacity: .4; }
+.facet-list label.on { background: var(--accent-bg); }
+.facet-list .none { padding: 6px 8px; color: var(--dim); }
+input[type=checkbox] { accent-color: var(--accent); }
+.row { display: flex; gap: 6px; align-items: center; }
+.row + .row { margin-top: 6px; }
+.row label { color: var(--muted); }
+.hint { color: var(--dim); font-size: 12px; margin-top: 4px; }
+
+.content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.toolbar {
+  display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line);
+  flex-wrap: wrap; flex: none;
+}
+.toolbar .count { color: var(--muted); }
+.toolbar .count b { color: var(--text); }
+.info { padding: 6px 12px; color: var(--muted); border-bottom: 1px solid var(--line); flex: none; font-size: 12px; }
+.info b { color: var(--accent); font-weight: 600; }
+.view { flex: 1; min-height: 0; display: none; }
+.view.on { display: flex; flex-direction: column; }
+
+/* table */
+.table-wrap { flex: 1; overflow: auto; position: relative; }
+table { border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; }
+th, td {
+  padding: 4px 9px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line);
+  white-space: nowrap; text-align: right;
+}
+thead th {
+  position: sticky; top: 0; z-index: 2; background: var(--panel2); color: var(--muted);
+  font-weight: 600; cursor: pointer; vertical-align: bottom; text-align: center;
+  white-space: normal; min-width: 64px; max-width: 120px; font-size: 12px; line-height: 1.25;
+}
+thead th:hover { color: var(--text); }
+thead th.sorted { color: var(--accent); }
+thead th .grp { display: block; color: var(--dim); font-weight: 400; font-size: 10.5px; }
+thead th.computed { background: #2d2640; color: #cdb8ff; }
+th.mat, td.mat {
+  position: sticky; left: 0; z-index: 1; text-align: left; background: var(--panel);
+  min-width: 230px; max-width: 290px; overflow: hidden; text-overflow: ellipsis; border-right: 1px solid var(--line2);
+}
+thead th.mat { z-index: 3; background: var(--panel2); text-align: left; max-width: none; }
+td.mat .brand { color: var(--muted); }
+td.mat .color { color: var(--dim); font-size: 11.5px; margin-left: 4px; }
+td.mat .pin { cursor: pointer; color: var(--dim); margin-right: 6px; display: inline-block; width: 1em; }
+td.mat .pin.on { color: var(--accent); }
+td.text { text-align: left; color: var(--muted); max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+td.null { color: var(--dim); }
+td.computed { background: rgba(124, 77, 255, .08); color: #ddd0ff; }
+tbody tr:hover td { background-color: #2a2a33; }
+tbody tr:hover td.mat { background: #2c2c35; }
+tbody tr.pinned td.mat { box-shadow: inset 3px 0 0 var(--accent); }
+td .day { color: var(--dim); font-size: 11px; margin-left: 3px; }
+
+/* charts */
+.chart-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.chart-controls label { color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.chart-box { flex: 1; min-height: 0; position: relative; padding: 10px 14px 12px; }
+.stat { color: var(--muted); }
+.stat b { color: var(--accent); }
+
+/* popover */
+.pop {
+  position: absolute; z-index: 20; background: var(--panel); border: 1px solid var(--line2); border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.5); padding: 10px; max-height: 70vh; overflow-y: auto; width: 320px; display: none;
+}
+.pop.on { display: block; }
+.pop label { display: flex; gap: 6px; align-items: center; padding: 2px 0; }
+.pop .grp-title { color: var(--dim); font-size: 11px; text-transform: uppercase; margin: 8px 0 2px; }
+
+/* drop zone */
+#drop {
+  position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center;
+  background: rgba(23, 23, 27, .92);
+}
+#drop.on { display: flex; }
+.drop-card {
+  border: 2px dashed var(--accent); border-radius: 14px; padding: 46px 60px; text-align: center; max-width: 520px;
+  background: var(--panel);
+}
+.drop-card h2 { margin: 0 0 8px; font-size: 18px; }
+.drop-card p { color: var(--muted); margin: 6px 0 18px; }
+.err { color: #ff8a9a; margin-top: 10px; }
+
+@media (max-width: 760px) {
+  main { flex-direction: column; }
+  aside { width: auto; max-height: 40vh; border-right: 0; border-bottom: 1px solid var(--line); }
+  header { flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Filament <span>Viewer</span></h1>
+  <span class="file-name" id="fileName"></span>
+  <select id="sheetSel" title="Sheet"></select>
+  <div class="tabs" id="tabs">
+    <button data-view="table" class="on">Table</button>
+    <button data-view="scatter">Scatter</button>
+    <button data-view="bars">Bars</button>
+    <button data-view="radar">Radar</button>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn" id="csvBtn" title="The rows and columns shown, with the computed creep">Export CSV</button>
+  <button class="btn" id="openBtn">Open .xlsx…</button>
+  <input type="file" id="fileInput" accept=".xlsx,.xls" hidden>
+</header>
+
+<main>
+  <aside id="side">
+    <h3>Search <button id="clearAll">clear all filters</button></h3>
+    <input type="search" id="q" placeholder="Any text: brand, type, colour…">
+
+    <h3>Base <button data-clear="base">clear</button></h3>
+    <div class="chips" id="f-base"></div>
+
+    <h3>Fibers <button data-clear="fibers">clear</button></h3>
+    <div class="chips" id="f-fibers"></div>
+
+    <h3>Brand <button data-clear="brand">clear</button></h3>
+    <input type="search" class="facet-q" data-facet="brand" placeholder="Find a brand…">
+    <div class="facet-list" id="f-brand"></div>
+
+    <h3>Filament type <button data-clear="type">clear</button></h3>
+    <input type="search" class="facet-q" data-facet="type" placeholder="Find a filament type…">
+    <div class="facet-list" id="f-type"></div>
+
+    <h3 id="creepH">Creep</h3>
+    <div id="creepBox">
+      <div class="row">
+        <label for="creepMode">Compare</label>
+        <select id="creepMode" style="flex:1">
+          <option value="common">to the last day all rows share</option>
+          <option value="last">to each row's own last day</option>
+        </select>
+      </div>
+      <div class="row">
+        <label for="creepNeed">Rows</label>
+        <select id="creepNeed" style="flex:1"></select>
+      </div>
+      <div class="hint">Creep = deflection on the last day − day 0 (mm), and as % of day 0.</div>
+    </div>
+
+    <h3>Pinned <button data-clear="pins">unpin all</button></h3>
+    <label class="row"><input type="checkbox" id="pinnedOnly"> show pinned rows only</label>
+    <div class="hint">☆ in the table or a click on a chart point pins a row. Radar shows the pinned rows.</div>
+  </aside>
+
+  <div class="content">
+    <div class="toolbar">
+      <span class="count" id="count"></span>
+      <div class="spacer"></div>
+      <label class="row" title="Shade each number by its rank in its column (purple = better)"><input type="checkbox" id="heat" checked> heatmap</label>
+      <button class="btn" id="colsBtn">Columns…</button>
+    </div>
+    <div class="info" id="creepInfo"></div>
+
+    <section class="view on" id="v-table"><div class="table-wrap" id="tableWrap"></div></section>
+
+    <section class="view" id="v-scatter">
+      <div class="chart-controls">
+        <label>X <select id="sx"></select></label>
+        <label>Y <select id="sy"></select></label>
+        <label>Colour by <select id="sc"></select></label>
+        <label><input type="checkbox" id="strend" checked> trend line</label>
+        <span class="stat" id="sstat"></span>
+      </div>
+      <div class="chart-box"><canvas id="cScatter"></canvas></div>
+    </section>
+
+    <section class="view" id="v-bars">
+      <div class="chart-controls">
+        <label>Value <select id="bm"></select></label>
+        <label>Group by <select id="bg"></select></label>
+        <label>Show <input type="number" id="bn" value="40" min="5" max="300" style="width:64px"></label>
+        <span class="stat" id="bstat"></span>
+      </div>
+      <div class="chart-box"><canvas id="cBars"></canvas></div>
+    </section>
+
+    <section class="view" id="v-radar">
+      <div class="chart-controls">
+        <button class="btn" id="radarCols">Axes…</button>
+        <span class="stat" id="rstat"></span>
+      </div>
+      <div class="chart-box"><canvas id="cRadar"></canvas></div>
+    </section>
+  </div>
+</main>
+
+<div class="pop" id="colsPop"></div>
+<div class="pop" id="radarPop"></div>
+
+<div id="drop">
+  <div class="drop-card">
+    <h2>Open the MyTechFun results</h2>
+    <p>Drop the <b>.xlsx</b> here, or pick it. It is read in this browser only and kept here for next time.</p>
+    <button class="btn primary" id="dropOpen">Choose file…</button>
+    <div class="err" id="err"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ---------- small helpers ---------- */
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const isNum = v => typeof v === "number" && isFinite(v);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("fv:" + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("fv:" + k, JSON.stringify(v)); } catch {} },
+};
+function fmt(v, col) {
+  if (v == null || v === "") return "";
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  if (isNum(v)) {
+    if (col && col.pct) return (v * 100).toFixed(1) + " %";
+    const a = Math.abs(v);
+    if (a >= 1000) return v.toFixed(0);
+    if (a >= 100) return (+v.toFixed(1)).toString();
+    if (a >= 10) return (+v.toFixed(2)).toString();
+    return (+v.toFixed(3)).toString();
+  }
+  return String(v);
+}
+
+/* ---------- file storage (IndexedDB) ---------- */
+const idb = {
+  open() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open("filament-viewer", 1);
+      r.onupgradeneeded = () => r.result.createObjectStore("files");
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    });
+  },
+  async put(v) {
+    try { const db = await this.open(); db.transaction("files", "readwrite").objectStore("files").put(v, "last"); } catch {}
+  },
+  async get() {
+    try {
+      const db = await this.open();
+      return await new Promise(res => {
+        const r = db.transaction("files").objectStore("files").get("last");
+        r.onsuccess = () => res(r.result); r.onerror = () => res(null);
+      });
+    } catch { return null; }
+  },
+};
+
+/* ---------- parsing ---------- */
+const LOWER_BETTER = /(\(mm\)|creep day|price|\$ ?\/ ?kg|difference from|diff\.? ?from|no load dim|deform after)/i;
+
+function parseWorkbook(buf) {
+  const wb = XLSX.read(buf, { type: "array", cellDates: true });
+  const sheets = [];
+  for (const name of wb.SheetNames) {
+    const s = parseSheet(name, wb.Sheets[name]);
+    if (s && s.rows.length) sheets.push(s);
+  }
+  return sheets;
+}
+
+function parseSheet(name, ws) {
+  const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+  let hr = -1, brandC = -1;
+  for (let r = 0; r < Math.min(12, aoa.length) && hr < 0; r++)
+    (aoa[r] || []).forEach((v, c) => { if (hr < 0 && typeof v === "string" && v.trim().toLowerCase() === "brand") { hr = r; brandC = c; } });
+  if (hr < 0) return null;
+  const head = aoa[hr];
+  // the row above the header names units or groups; merged cells there span several columns
+  const notes = [];
+  let sheetNote = "";
+  if (hr > 0) {
+    const above = aoa[hr - 1] || [];
+    above.forEach((v, c) => { if (v != null) notes[c] = String(v).trim(); });
+    for (const m of ws["!merges"] || []) {
+      if (m.s.r !== hr - 1) continue;
+      for (let c = m.s.c; c <= m.e.c; c++) notes[c] = notes[m.s.c];
+    }
+    // a long text over the Brand column is the sheet's title, not a column group
+    if (notes[brandC] && notes[brandC].length > 40) { sheetNote = notes[brandC]; notes[brandC] = ""; }
+  }
+  const findCol = re => head.findIndex((v, c) => c !== brandC && typeof v === "string" && re.test(v.trim()));
+  const typeC = findCol(/^(filament )?type$/i), baseC = findCol(/^base$/i);
+  const colorC = findCol(/^colou?r$/i), fibC = findCol(/^fibers?$/i);
+
+  const rawRows = [];
+  for (let r = hr + 1; r < aoa.length; r++) {
+    const row = aoa[r] || [];
+    const brand = row[brandC];
+    if (brand == null || String(brand).trim() === "") continue;
+    if ((typeC < 0 || row[typeC] == null) && (baseC < 0 || row[baseC] == null)) continue; // notes like "New rows in orange bg."
+    if (!row.some((v, c) => c !== brandC && isNum(v))) continue;
+    rawRows.push(row);
+  }
+
+  const cols = [];
+  head.forEach((h, c) => {
+    if (h == null || String(h).trim() === "") return;
+    const vals = rawRows.map(r => r[c]).filter(v => v != null && v !== "");
+    if (!vals.length) return;
+    const label = String(h).replace(/\s+/g, " ").trim();
+    const nNum = vals.filter(isNum).length, nDate = vals.filter(v => v instanceof Date).length;
+    let type = "text";
+    if (nDate / vals.length > 0.8) type = "date";
+    else if (nNum / vals.length > 0.8) type = "num";
+    else if (vals.every(v => typeof v === "string" && /^https?:\/\//.test(v))) type = "link";
+    const group = notes[c] || "";
+    const m = label.match(/creep\s*day\s*(\d+)/i);
+    const col = {
+      key: "c" + c, idx: c, label, group, type,
+      lowerBetter: LOWER_BETTER.test(label + " " + group),
+      pct: /%/.test(label) && vals.filter(isNum).every(v => Math.abs(v) <= 1.5),
+      creepDay: m ? +m[1] : null,
+    };
+    if (c === brandC) col.role = "brand";
+    if (c === typeC) col.role = "type";
+    if (c === baseC) col.role = "base";
+    if (c === colorC) col.role = "color";
+    if (c === fibC) col.role = "fibers";
+    cols.push(col);
+  });
+
+  // brands spelled with different case ("PolyMaker" / "Polymaker") become one
+  const spell = {};
+  for (const r of rawRows) { const b = String(r[brandC]).trim(); const k = b.toLowerCase(); (spell[k] ||= {})[b] = (spell[k][b] || 0) + 1; }
+  const brandName = k => Object.entries(spell[k]).sort((a, b) => b[1] - a[1])[0][0];
+
+  const rows = rawRows.map((r, i) => {
+    const o = { _id: name + ":" + i };
+    for (const col of cols) {
+      let v = r[col.idx];
+      if (typeof v === "string") { v = v.trim(); if (v === "") v = null; }
+      if (col.type === "num" && typeof v === "string" && /^-?\d+([.,]\d+)?$/.test(v)) v = parseFloat(v.replace(",", "."));
+      o[col.key] = v;
+    }
+    o._brand = brandName(String(r[brandC]).trim().toLowerCase());
+    o._type = typeC >= 0 && r[typeC] != null ? String(r[typeC]).trim() : "";
+    o._base = baseC >= 0 && r[baseC] != null ? String(r[baseC]).trim() : "";
+    o._color = colorC >= 0 && r[colorC] != null ? String(r[colorC]).trim() : "";
+    o._fibers = fibC >= 0 && r[fibC] != null ? String(r[fibC]).trim().toLowerCase() : "";
+    o._name = (o._brand + " " + (o._type || o._base)).trim();
+    o._text = [o._brand, o._type, o._base, o._color, o._fibers].join(" ").toLowerCase();
+    return o;
+  });
+  const creepCols = cols.filter(c => c.creepDay != null && c.type === "num").sort((a, b) => a.creepDay - b.creepDay);
+  return { name, cols, rows, creepCols, sheetNote, has: { base: baseC >= 0, fibers: fibC >= 0, type: typeC >= 0 } };
+}
+
+/* ---------- creep ---------- */
+function creepDays(sheet, row) {
+  const d0 = sheet.creepCols.find(c => c.creepDay === 0);
+  if (!d0 || !isNum(row[d0.key])) return [];
+  return sheet.creepCols.filter(c => isNum(row[c.key])).map(c => c.creepDay);
+}
+// The comparison horizon: the last day every row with creep data has (day 0 and at least one later day).
+function creepHorizon(sheet, rows) {
+  let common = null, withData = 0;
+  for (const r of rows) {
+    const days = creepDays(sheet, r);
+    if (days.length < 2) continue;
+    withData++;
+    common = common ? common.filter(d => days.includes(d)) : days;
+  }
+  const later = (common || []).filter(d => d > 0);
+  return { day: later.length ? Math.max(...later) : null, withData, without: rows.length - withData };
+}
+function computeCreep(sheet, rows) {
+  const h = creepHorizon(sheet, rows);
+  const mode = state.creepMode === "last" || h.day == null ? "last" : "common";
+  const byDay = Object.fromEntries(sheet.creepCols.map(c => [c.creepDay, c.key]));
+  for (const r of sheet.rows) r._creepMm = r._creepPct = r._creepDay = null; // rows filtered out keep no stale value
+  for (const r of rows) {
+    const days = creepDays(sheet, r);
+    if (days.length < 2) continue;
+    const d = mode === "common" ? h.day : Math.max(...days);
+    const v0 = r[byDay[0]], vd = r[byDay[d]];
+    if (!isNum(v0) || !isNum(vd)) continue;
+    r._creepMm = vd - v0;
+    r._creepPct = v0 ? (vd - v0) / v0 : null;
+    r._creepDay = d;
+  }
+  return { ...h, mode };
+}
+
+/* ---------- state ---------- */
+let SHEETS = [], sheet = null, creepState = null;
+const state = Object.assign({
+  view: "table", sheet: null, q: "",
+  base: [], fibers: [], brand: [], type: [],
+  creepMode: "common", creepNeed: "any",
+  pins: [], pinnedOnly: false, heat: true,
+  sort: null, hidden: {}, sx: null, sy: null, sc: "base", strend: true,
+  bm: null, bg: "base", bn: 40, radarCols: null,
+}, store.get("state", {}));
+const facetQ = { brand: "", type: "" };
+const save = () => store.set("state", state);
+
+function computedCols() {
+  if (!sheet.creepCols.length) return [];
+  const label = creepState && creepState.mode === "common" && creepState.day != null
+    ? `Creep d0→d${creepState.day}` : "Creep d0→last";
+  return [
+    { key: "_creepMm", label: label + " (mm)", group: "computed", type: "num", lowerBetter: true, computed: true },
+    { key: "_creepPct", label: label + " (%)", group: "computed: of day 0", type: "num", lowerBetter: true, computed: true, pct: true },
+  ];
+}
+function allCols() {
+  const base = sheet.cols.filter(c => c.role !== "brand" && c.role !== "type" && c.role !== "color");
+  const comp = computedCols();
+  // computed creep goes right after the last creep day column
+  const lastCreep = base.reduce((i, c, k) => (c.creepDay != null ? k : i), -1);
+  if (lastCreep < 0) return base.concat(comp);
+  return [...base.slice(0, lastCreep + 1), ...comp, ...base.slice(lastCreep + 1)];
+}
+const visibleCols = () => allCols().filter(c => !(state.hidden[sheet.name] || []).includes(c.key));
+const numCols = () => allCols().filter(c => c.type === "num");
+const colByKey = k => allCols().find(c => c.key === k);
+
+/* ---------- filtering ---------- */
+const FACETS = {
+  base: r => r._base || "—", fibers: r => r._fibers || "—", brand: r => r._brand, type: r => r._type || "—",
+};
+function passes(r, skip) {
+  if (state.q && !state.q.toLowerCase().split(/\s+/).every(t => r._text.includes(t))) return false;
+  for (const f in FACETS) if (f !== skip && state[f].length && !state[f].includes(FACETS[f](r))) return false;
+  if (state.pinnedOnly && !state.pins.includes(r._id)) return false;
+  if (state.creepNeed !== "any") {
+    const days = creepDays(sheet, r);
+    if (days.length < 2) return false;
+    if (state.creepNeed !== "has" && !days.includes(+state.creepNeed)) return false;
+  }
+  return true;
+}
+const filtered = () => sheet.rows.filter(r => passes(r));
+
+/* ---------- sidebar ---------- */
+function renderFacets() {
+  for (const f of ["base", "fibers"]) {
+    const box = $("#f-" + f);
+    const show = f === "base" ? sheet.has.base : sheet.has.fibers;
+    box.previousElementSibling.style.display = box.style.display = show ? "" : "none";
+    if (!show) continue;
+    const counts = facetCounts(f);
+    box.innerHTML = counts.map(([v, n]) =>
+      `<span class="chip ${state[f].includes(v) ? "on" : ""} ${n ? "" : "zero"}" data-f="${f}" data-v="${esc(v)}">${esc(v)}<small>${n}</small></span>`).join("");
+  }
+  for (const f of ["brand", "type"]) {
+    const box = $("#f-" + f);
+    const show = f === "brand" || sheet.has.type;
+    box.style.display = box.previousElementSibling.style.display = box.previousElementSibling.previousElementSibling.style.display = show ? "" : "none";
+    if (!show) continue;
+    const q = facetQ[f].toLowerCase();
+    let counts = facetCounts(f).filter(([v]) => !q || v.toLowerCase().includes(q) || state[f].includes(v));
+    counts.sort((a, b) => (state[f].includes(b[0]) - state[f].includes(a[0])) || a[0].localeCompare(b[0], undefined, { sensitivity: "base" }));
+    box.innerHTML = counts.length ? counts.map(([v, n]) => {
+      const on = state[f].includes(v);
+      return `<label class="${on ? "on" : ""} ${n ? "" : "zero"}"><input type="checkbox" data-f="${f}" data-v="${esc(v)}" ${on ? "checked" : ""}><span title="${esc(v)}">${esc(v)}</span><small>${n}</small></label>`;
+    }).join("") : `<div class="none">No match</div>`;
+  }
+  // creep options
+  const has = sheet.creepCols.length > 0;
+  $("#creepH").style.display = $("#creepBox").style.display = has ? "" : "none";
+  if (has) {
+    const opts = [["any", "all rows"], ["has", "with creep data"],
+      ...sheet.creepCols.filter(c => c.creepDay > 1).map(c => [String(c.creepDay), `with data on day ${c.creepDay}`])];
+    if (!opts.some(o => o[0] === state.creepNeed)) state.creepNeed = "any";
+    $("#creepNeed").innerHTML = opts.map(([v, t]) => `<option value="${v}" ${v === state.creepNeed ? "selected" : ""}>${t}</option>`).join("");
+    $("#creepMode").value = state.creepMode;
+  }
+}
+function facetCounts(f) {
+  const all = new Map();
+  for (const r of sheet.rows) all.set(FACETS[f](r), 0);
+  for (const r of sheet.rows) if (passes(r, f)) all.set(FACETS[f](r), all.get(FACETS[f](r)) + 1);
+  return [...all.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
+/* ---------- table ---------- */
+function sortRows(rows) {
+  const s = state.sort;
+  if (!s) return rows;
+  const get = s.key === "_name" ? r => r._name.toLowerCase() : r => r[s.key];
+  const dir = s.dir === "asc" ? 1 : -1;
+  const val = v => v instanceof Date ? v.getTime() : v === "max" ? Infinity : v;
+  return rows.slice().sort((a, b) => {
+    let x = val(get(a)), y = val(get(b));
+    const xn = x == null || x === "", yn = y == null || y === "";
+    if (xn || yn) return xn - yn; // empty cells last either way
+    if (typeof x === "number" && typeof y === "number") return (x - y) * dir;
+    if (typeof x === "number") return -1;
+    if (typeof y === "number") return 1;
+    return String(x).localeCompare(String(y), undefined, { numeric: true }) * dir;
+  });
+}
+function heatRanks(rows, cols) {
+  const out = {};
+  for (const c of cols) {
+    if (c.type !== "num") continue;
+    const vals = rows.map(r => r[c.key]).filter(isNum).sort((a, b) => a - b);
+    if (vals.length < 3) continue;
+    out[c.key] = v => {
+      if (!isNum(v)) return null;
+      let lo = 0, hi = vals.length;
+      while (lo < hi) { const m = (lo + hi) >> 1; if (vals[m] < v) lo = m + 1; else hi = m; }
+      const p = lo / (vals.length - 1);
+      return c.lowerBetter ? 1 - p : p;
+    };
+  }
+  return out;
+}
+function renderTable(rows) {
+  const cols = visibleCols();
+  const s = state.sort || {};
+  const arrow = k => s.key === k ? (s.dir === "asc" ? " ▲" : " ▼") : "";
+  const heat = state.heat ? heatRanks(rows, cols) : {};
+  const pins = new Set(state.pins);
+  let h = `<table><thead><tr><th class="mat ${s.key === "_name" ? "sorted" : ""}" data-k="_name">Material${arrow("_name")}</th>`;
+  for (const c of cols) {
+    const tip = [c.label, c.group, c.lowerBetter ? "lower is better" : c.type === "num" ? "higher is better" : ""].filter(Boolean).join("\n");
+    h += `<th data-k="${c.key}" title="${esc(tip)}" class="${s.key === c.key ? "sorted" : ""} ${c.computed ? "computed" : ""}">` +
+      (c.group && !c.computed ? `<span class="grp">${esc(c.group)}</span>` : "") + `${esc(c.label)}${arrow(c.key)}</th>`;
+  }
+  h += `</tr></thead><tbody>`;
+  for (const r of rows) {
+    const on = pins.has(r._id);
+    h += `<tr class="${on ? "pinned" : ""}" data-id="${esc(r._id)}"><td class="mat" title="${esc(r._name + (r._color ? " · " + r._color : ""))}">` +
+      `<span class="pin ${on ? "on" : ""}" data-pin="${esc(r._id)}">${on ? "★" : "☆"}</span>` +
+      `<span class="brand">${esc(r._brand)}</span> ${esc(r._type || r._base)}` +
+      (r._color ? `<span class="color">${esc(r._color)}</span>` : "") + `</td>`;
+    for (const c of cols) {
+      const v = r[c.key];
+      if (v == null || v === "") { h += `<td class="null ${c.computed ? "computed" : ""}"></td>`; continue; }
+      if (c.type === "link" || (typeof v === "string" && /^https?:\/\//.test(v))) {
+        h += `<td class="text"><a href="${esc(v)}" target="_blank" rel="noopener">${/youtu/.test(v) ? "▶ video" : "link"}</a></td>`;
+        continue;
+      }
+      let style = "";
+      const hf = heat[c.key];
+      if (hf) { const p = hf(v); if (p != null) style = ` style="background-color: rgba(163,123,255,${(0.04 + 0.42 * p * p).toFixed(3)})"`; }
+      let txt = esc(fmt(v, c));
+      if (c.key === "_creepMm" && creepState.mode === "last" && r._creepDay != null) txt += `<span class="day">d${r._creepDay}</span>`;
+      const tip = typeof v === "string" && v.length > 24 ? ` title="${esc(v)}"` : "";
+      h += `<td class="${typeof v === "number" || v instanceof Date ? "" : "text"} ${c.computed ? "computed" : ""}"${style}${tip}>${txt}</td>`;
+    }
+    h += `</tr>`;
+  }
+  h += `</tbody></table>`;
+  const wrap = $("#tableWrap"), sx = wrap.scrollLeft, sy = wrap.scrollTop;
+  wrap.innerHTML = h;
+  wrap.scrollLeft = sx; wrap.scrollTop = sy;
+}
+
+/* ---------- charts ---------- */
+Chart.defaults.color = "#9b98a8";
+Chart.defaults.borderColor = "#34343d";
+Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+const PALETTE = ["#a37bff", "#5ec8e5", "#f07fb8", "#f0b86e", "#7fd6a4", "#e86a5c", "#c9d36a", "#7f9cff", "#d79bff", "#4fb3a0", "#ff9f6e", "#b0aec0"];
+const charts = {};
+function chart(id, cfg) { if (charts[id]) charts[id].destroy(); charts[id] = new Chart($("#" + id), cfg); return charts[id]; }
+// chart values: percent columns as percent, not as a fraction
+const cv = (r, c) => isNum(r[c.key]) ? (c.pct ? r[c.key] * 100 : r[c.key]) : null;
+const cfmt = (v, c) => fmt(v) + (c.pct ? " %" : "");
+const axisLabel = c => c ? (c.group && !c.computed ? `${c.label} · ${c.group}` : c.label) : "";
+const tooltipBase = { backgroundColor: "#26262d", borderColor: "#44444f", borderWidth: 1, titleColor: "#e7e5ee", bodyColor: "#e7e5ee", padding: 8 };
+const gridScale = title => ({ title: { display: true, text: title, color: "#cdb8ff", font: { size: 12, weight: "600" } }, grid: { color: "#2b2b33" } });
+
+function fillSelect(sel, cols, val, extra = []) {
+  sel.innerHTML = extra.map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join("") +
+    cols.map(c => `<option value="${c.key}">${esc(c.label)}${c.group && !c.computed ? " — " + esc(c.group) : ""}</option>`).join("");
+  sel.value = val;
+  if (sel.value !== val && sel.options.length) sel.selectedIndex = 0;
+  return sel.value;
+}
+function groupKeyFn(g) {
+  return g === "base" ? r => r._base || "—" : g === "fibers" ? r => r._fibers || "—" : g === "brand" ? r => r._brand : null;
+}
+function groupOptions() {
+  const o = [];
+  if (sheet.has.base) o.push(["base", "Base"]);
+  if (sheet.has.fibers) o.push(["fibers", "Fibers"]);
+  o.push(["brand", "Brand"]);
+  return o;
+}
+
+function renderScatter(rows) {
+  const nc = numCols();
+  const def = (k, i) => nc.find(c => c.key === k) ? k : (nc[i] || nc[0] || {}).key;
+  state.sx = fillSelect($("#sx"), nc, def(state.sx, 0));
+  state.sy = fillSelect($("#sy"), nc, def(state.sy, 1));
+  const go = groupOptions();
+  $("#sc").innerHTML = go.map(([v, t]) => `<option value="${v}">${t}</option>`).join("");
+  $("#sc").value = go.some(o => o[0] === state.sc) ? state.sc : go[0][0];
+  state.sc = $("#sc").value;
+  $("#strend").checked = state.strend;
+  const cx = colByKey(state.sx), cy = colByKey(state.sy);
+  if (!cx || !cy) return;
+  const pts = rows.filter(r => isNum(r[cx.key]) && isNum(r[cy.key]));
+  const gk = groupKeyFn(state.sc);
+  const counts = {};
+  pts.forEach(r => counts[gk(r)] = (counts[gk(r)] || 0) + 1);
+  const groups = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+  const top = groups.slice(0, PALETTE.length - 1);
+  const pins = new Set(state.pins);
+  const sets = {};
+  for (const r of pts) {
+    const g = top.includes(gk(r)) ? gk(r) : "Other";
+    (sets[g] ||= []).push({ x: cv(r, cx), y: cv(r, cy), r });
+  }
+  const datasets = Object.entries(sets).map(([g, data]) => {
+    const col = g === "Other" ? PALETTE[PALETTE.length - 1] : PALETTE[top.indexOf(g)];
+    return {
+      label: `${g} (${data.length})`, data, backgroundColor: col + "cc", borderColor: data.map(d => pins.has(d.r._id) ? "#ffffff" : col),
+      borderWidth: data.map(d => pins.has(d.r._id) ? 2.5 : 1), pointRadius: data.map(d => pins.has(d.r._id) ? 7 : 4), pointHoverRadius: 8,
+    };
+  });
+  // correlation and least-squares line
+  const n = pts.length;
+  let stat = `n = <b>${n}</b>`;
+  if (n > 2) {
+    const xs = pts.map(r => cv(r, cx)), ys = pts.map(r => cv(r, cy));
+    const mx = xs.reduce((a, b) => a + b) / n, my = ys.reduce((a, b) => a + b) / n;
+    let sxy = 0, sxx = 0, syy = 0;
+    for (let i = 0; i < n; i++) { sxy += (xs[i] - mx) * (ys[i] - my); sxx += (xs[i] - mx) ** 2; syy += (ys[i] - my) ** 2; }
+    if (sxx > 0 && syy > 0) {
+      const rr = sxy / Math.sqrt(sxx * syy), b = sxy / sxx, a = my - b * mx;
+      stat += ` · Pearson r = <b>${rr.toFixed(3)}</b> · R² = <b>${(rr * rr).toFixed(3)}</b>`;
+      if (state.strend) {
+        const x0 = Math.min(...xs), x1 = Math.max(...xs);
+        datasets.push({ type: "line", label: "trend", data: [{ x: x0, y: a + b * x0 }, { x: x1, y: a + b * x1 }],
+          borderColor: "#e7e5ee88", borderDash: [6, 5], borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 0 });
+      }
+    }
+  }
+  $("#sstat").innerHTML = stat;
+  chart("cScatter", {
+    type: "scatter", data: { datasets },
+    options: {
+      maintainAspectRatio: false, animation: false,
+      scales: { x: gridScale(axisLabel(cx)), y: gridScale(axisLabel(cy)) },
+      plugins: {
+        legend: { position: "right", labels: { boxWidth: 10, filter: i => i.text !== "trend" } },
+        tooltip: { ...tooltipBase, filter: i => i.raw && i.raw.r, callbacks: {
+          title: items => items.map(i => i.raw.r._name + (i.raw.r._color ? " · " + i.raw.r._color : "")),
+          label: i => `${cx.label}: ${cfmt(i.raw.x, cx)}   ${cy.label}: ${cfmt(i.raw.y, cy)}`,
+        } },
+      },
+      onClick: (e, els) => {
+        const el = els.find(x => charts.cScatter.data.datasets[x.datasetIndex].data[x.index].r);
+        if (el) togglePin(charts.cScatter.data.datasets[el.datasetIndex].data[el.index].r._id);
+      },
+    },
+  });
+}
+
+function renderBars(rows) {
+  const nc = numCols();
+  state.bm = fillSelect($("#bm"), nc, nc.find(c => c.key === state.bm) ? state.bm : (nc[0] || {}).key);
+  const go = [["none", "— each row"], ...groupOptions()];
+  $("#bg").innerHTML = go.map(([v, t]) => `<option value="${v}">${t}</option>`).join("");
+  $("#bg").value = go.some(o => o[0] === state.bg) ? state.bg : "none";
+  state.bg = $("#bg").value;
+  $("#bn").value = state.bn;
+  const c = colByKey(state.bm);
+  if (!c) return;
+  const better = (a, b) => c.lowerBetter ? a - b : b - a;
+  let labels, values, extra, colors;
+  const pins = new Set(state.pins);
+  const have = rows.filter(r => isNum(r[c.key]));
+  if (state.bg === "none") {
+    const list = have.slice().sort((a, b) => better(a[c.key], b[c.key])).slice(0, state.bn);
+    labels = list.map(r => r._name + (r._color ? ` (${r._color})` : ""));
+    values = list.map(r => cv(r, c));
+    extra = list.map(r => r);
+    colors = list.map(r => pins.has(r._id) ? "#f0b86e" : "#a37bff");
+    $("#bstat").innerHTML = `best ${list.length} of <b>${have.length}</b> rows with a value · ${c.lowerBetter ? "lower" : "higher"} is better`;
+  } else {
+    const gk = groupKeyFn(state.bg), g = {};
+    for (const r of have) (g[gk(r)] ||= []).push(cv(r, c));
+    const list = Object.entries(g).map(([k, v]) => ({ k, n: v.length, mean: v.reduce((a, b) => a + b) / v.length, min: Math.min(...v), max: Math.max(...v) }))
+      .sort((a, b) => better(a.mean, b.mean)).slice(0, state.bn);
+    labels = list.map(x => `${x.k} (${x.n})`);
+    values = list.map(x => x.mean);
+    extra = list;
+    colors = list.map(() => "#a37bff");
+    $("#bstat").innerHTML = `mean per ${state.bg}, the line spans min to max · <b>${have.length}</b> rows`;
+  }
+  const datasets = [{ label: c.label, data: values, backgroundColor: colors.map(x => x + "bb"), borderColor: colors, borderWidth: 1, barPercentage: .85 }];
+  if (state.bg !== "none") datasets.push({ type: "bar", label: "range", data: extra.map(x => [x.min, x.max]), backgroundColor: "#e7e5ee33", borderColor: "#e7e5ee66", borderWidth: 1, barPercentage: .18, grouped: false });
+  const box = $("#cBars").parentElement;
+  box.style.height = ""; // the canvas grows with the number of bars
+  chart("cBars", {
+    type: "bar", data: { labels, datasets },
+    options: {
+      indexAxis: "y", maintainAspectRatio: false, animation: false,
+      scales: { x: gridScale(axisLabel(c)), y: { ticks: { autoSkip: false, font: { size: 11 } }, grid: { display: false } } },
+      plugins: { legend: { display: false }, tooltip: { ...tooltipBase, callbacks: {
+        label: i => {
+          if (state.bg === "none") return `${c.label}: ${cfmt(i.raw, c)}`;
+          const x = extra[i.dataIndex];
+          return `mean ${cfmt(x.mean, c)} · min ${cfmt(x.min, c)} · max ${cfmt(x.max, c)} · n ${x.n}`;
+        } } } },
+      onClick: (e, els) => { if (state.bg === "none" && els[0]) togglePin(extra[els[0].index]._id); },
+    },
+  });
+}
+
+const RADAR_DEFAULT = [/^tensile/i, /^layer adhesion/i, /^shear stress/i, /^max torque \(nm\)/i, /^digital izod/i, /^flexural modulus/i, /^deform temp/i, /^creep d0/i];
+function radarKeys() {
+  const nc = numCols();
+  if (state.radarCols && state.radarCols[sheet.name]) return state.radarCols[sheet.name].filter(k => nc.some(c => c.key === k));
+  const keys = [];
+  for (const re of RADAR_DEFAULT) { const c = nc.find(c => re.test(c.label) && !keys.includes(c.key)); if (c) keys.push(c.key); }
+  return keys.length >= 3 ? keys : nc.slice(0, 6).map(c => c.key);
+}
+function renderRadar(rows) {
+  const keys = radarKeys(), cols = keys.map(colByKey).filter(Boolean);
+  let list = sheet.rows.filter(r => state.pins.includes(r._id));
+  let note = "";
+  if (!list.length) {
+    const k = cols[0] && cols[0].key;
+    const lb = cols[0] && cols[0].lowerBetter;
+    list = rows.filter(r => isNum(r[k])).sort((a, b) => lb ? a[k] - b[k] : b[k] - a[k]).slice(0, 4);
+    note = `No pinned rows: showing the top 4 by ${cols[0] ? cols[0].label : ""}. Pin rows with ☆ to compare them.`;
+  }
+  list = list.slice(0, 10);
+  // percentile among every row of the sheet, flipped where lower is better, so outward is always better
+  const ranks = heatRanks(sheet.rows, cols);
+  const datasets = list.map((r, i) => {
+    const col = PALETTE[i % PALETTE.length];
+    return { label: r._name + (r._color ? ` (${r._color})` : ""), data: cols.map(c => ranks[c.key] ? (ranks[c.key](r[c.key]) ?? null) : null),
+      raw: cols.map(c => r[c.key]), borderColor: col, backgroundColor: col + "26", pointBackgroundColor: col, borderWidth: 2, spanGaps: true };
+  });
+  $("#rstat").innerHTML = note || `<b>${list.length}</b> pinned · each axis is the rank among all ${sheet.rows.length} rows (outward = better; lower-is-better axes are flipped)`;
+  chart("cRadar", {
+    type: "radar", data: { labels: cols.map(c => c.label), datasets },
+    options: {
+      maintainAspectRatio: false, animation: false,
+      scales: { r: { min: 0, max: 1, ticks: { display: false, stepSize: .25 }, grid: { color: "#34343d" }, angleLines: { color: "#34343d" }, pointLabels: { color: "#cdb8ff", font: { size: 12 } } } },
+      plugins: { legend: { position: "right" }, tooltip: { ...tooltipBase, callbacks: {
+        label: i => `${i.dataset.label}: ${fmt(i.dataset.raw[i.dataIndex], cols[i.dataIndex])} (rank ${Math.round((i.raw ?? 0) * 100)} %)`,
+      } } },
+    },
+  });
+}
+
+/* ---------- popovers ---------- */
+function openPop(pop, anchor, html, onChange) {
+  $$(".pop").forEach(p => p !== pop && p.classList.remove("on"));
+  if (pop.classList.toggle("on")) {
+    pop.innerHTML = html;
+    const r = anchor.getBoundingClientRect();
+    pop.style.top = r.bottom + 6 + "px";
+    pop.style.left = Math.max(8, Math.min(innerWidth - 330, r.right - 320)) + "px";
+    pop.onchange = onChange;
+  }
+}
+function colsPopHtml(keys, checked, actions) {
+  let h = `<div class="row" style="justify-content:space-between">${actions}</div>`, grp = null;
+  for (const c of allCols()) {
+    if (!keys.includes(c.key)) continue;
+    const g = c.computed ? "computed" : c.group || "";
+    if (g !== grp) { grp = g; if (g) h += `<div class="grp-title">${esc(g)}</div>`; }
+    h += `<label><input type="checkbox" value="${c.key}" ${checked(c.key) ? "checked" : ""}> ${esc(c.label)}</label>`;
+  }
+  return h;
+}
+$("#colsBtn").onclick = e => {
+  const hid = () => state.hidden[sheet.name] || [];
+  const keys = allCols().map(c => c.key);
+  openPop($("#colsPop"), e.currentTarget, colsPopHtml(keys, k => !hid().includes(k),
+    `<button class="btn" data-a="all">show all</button><button class="btn" data-a="none">hide all</button>`), ev => {
+    const k = ev.target.value, h = new Set(hid());
+    ev.target.checked ? h.delete(k) : h.add(k);
+    state.hidden[sheet.name] = [...h]; save(); render();
+  });
+  $("#colsPop").onclick = ev => {
+    const a = ev.target.dataset.a;
+    if (!a) return;
+    state.hidden[sheet.name] = a === "all" ? [] : keys.slice();
+    $$("#colsPop input").forEach(i => i.checked = a === "all");
+    save(); render();
+  };
+};
+$("#radarCols").onclick = e => {
+  const keys = numCols().map(c => c.key);
+  openPop($("#radarPop"), e.currentTarget, colsPopHtml(keys, k => radarKeys().includes(k), `<span class="hint">Radar axes</span>`), ev => {
+    const cur = new Set(radarKeys());
+    ev.target.checked ? cur.add(ev.target.value) : cur.delete(ev.target.value);
+    state.radarCols = state.radarCols || {};
+    state.radarCols[sheet.name] = allCols().map(c => c.key).filter(k => cur.has(k));
+    save(); render();
+  });
+  $("#radarPop").onclick = null;
+};
+document.addEventListener("mousedown", e => {
+  if (!e.target.closest(".pop") && !e.target.closest("#colsBtn") && !e.target.closest("#radarCols")) $$(".pop").forEach(p => p.classList.remove("on"));
+});
+
+/* ---------- main render ---------- */
+function togglePin(id) {
+  const i = state.pins.indexOf(id);
+  i >= 0 ? state.pins.splice(i, 1) : state.pins.push(id);
+  save(); render();
+}
+function render() {
+  if (!sheet) return;
+  // computed creep depends on the rows shown, so compute it before sorting and before the charts
+  const rows = filtered();
+  creepState = computeCreep(sheet, rows);
+  const sorted = sortRows(rows);
+  renderFacets();
+  const pinned = state.pins.filter(id => sheet.rows.some(r => r._id === id)).length;
+  $("#count").innerHTML = `<b>${rows.length}</b> of ${sheet.rows.length} rows` + (pinned ? ` · <b>${pinned}</b> pinned` : "");
+  const info = $("#creepInfo");
+  if (sheet.creepCols.length) {
+    const cs = creepState;
+    info.style.display = "";
+    if (!cs.withData) info.innerHTML = "No row shown has creep data.";
+    else if (cs.mode === "common")
+      info.innerHTML = `Creep compared from day 0 to <b>day ${cs.day}</b>, the last day all ${cs.withData} rows with creep data share` +
+        (cs.without ? ` (${cs.without} rows have none)` : "") + (cs.day < sheet.creepCols[sheet.creepCols.length - 1].creepDay ? `. Filter to fewer rows, or Rows: “with data on day ${sheet.creepCols[sheet.creepCols.length - 1].creepDay}”, for a longer horizon.` : ".");
+    else info.innerHTML = `Creep from day 0 to each row's own last day (the small d# beside it): days differ, so compare with care.` +
+      (state.creepMode === "common" ? " The rows shown share no day after day 0." : "");
+  } else info.style.display = sheet.sheetNote ? "" : "none";
+  if (!sheet.creepCols.length && sheet.sheetNote) info.textContent = sheet.sheetNote;
+  $$("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.view === state.view));
+  $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + state.view));
+  $("#heat").checked = state.heat;
+  $("#pinnedOnly").checked = state.pinnedOnly;
+  if (state.view === "table") renderTable(sorted);
+  if (state.view === "scatter") renderScatter(rows);
+  if (state.view === "bars") renderBars(rows);
+  if (state.view === "radar") renderRadar(rows);
+}
+
+/* ---------- events ---------- */
+$("#tabs").onclick = e => { const v = e.target.dataset.view; if (v) { state.view = v; save(); render(); } };
+$("#q").oninput = e => { state.q = e.target.value; save(); render(); };
+$$(".facet-q").forEach(i => i.oninput = () => { facetQ[i.dataset.facet] = i.value; renderFacets(); });
+$("#side").addEventListener("click", e => {
+  const chip = e.target.closest(".chip");
+  if (chip) {
+    const f = chip.dataset.f, v = chip.dataset.v, a = state[f];
+    a.includes(v) ? a.splice(a.indexOf(v), 1) : a.push(v);
+    save(); render(); return;
+  }
+  const cl = e.target.dataset.clear;
+  if (cl) { if (cl === "pins") { state.pins = []; state.pinnedOnly = false; } else state[cl] = []; save(); render(); }
+});
+$("#side").addEventListener("change", e => {
+  const t = e.target;
+  if (t.dataset.f) {
+    const a = state[t.dataset.f], v = t.dataset.v;
+    t.checked ? a.includes(v) || a.push(v) : a.includes(v) && a.splice(a.indexOf(v), 1);
+    // keep the list search so several matches can be ticked in a row
+    save(); render();
+  }
+});
+$("#clearAll").onclick = () => {
+  Object.assign(state, { q: "", base: [], fibers: [], brand: [], type: [], creepNeed: "any", pinnedOnly: false });
+  $("#q").value = ""; $$(".facet-q").forEach(i => i.value = ""); facetQ.brand = facetQ.type = "";
+  save(); render();
+};
+$("#creepMode").onchange = e => { state.creepMode = e.target.value; save(); render(); };
+$("#creepNeed").onchange = e => { state.creepNeed = e.target.value; save(); render(); };
+$("#pinnedOnly").onchange = e => { state.pinnedOnly = e.target.checked; save(); render(); };
+$("#heat").onchange = e => { state.heat = e.target.checked; save(); render(); };
+$("#tableWrap").addEventListener("click", e => {
+  const pin = e.target.closest("[data-pin]");
+  if (pin) { togglePin(pin.dataset.pin); return; }
+  const th = e.target.closest("th[data-k]");
+  if (th) {
+    const k = th.dataset.k, s = state.sort;
+    const c = colByKey(k);
+    const first = k === "_name" || (c && c.type !== "num") ? "asc" : c && c.lowerBetter ? "asc" : "desc";
+    if (!s || s.key !== k) state.sort = { key: k, dir: first };
+    else if (s.dir === first) state.sort = { key: k, dir: first === "asc" ? "desc" : "asc" };
+    else state.sort = null;
+    save(); render();
+  }
+});
+for (const id of ["sx", "sy", "sc", "bm", "bg"]) $("#" + id).onchange = e => { state[id] = e.target.value; save(); render(); };
+$("#strend").onchange = e => { state.strend = e.target.checked; save(); render(); };
+$("#bn").onchange = e => { state.bn = Math.max(5, Math.min(300, +e.target.value || 40)); save(); render(); };
+$("#sheetSel").onchange = e => { selectSheet(e.target.value); };
+
+$("#csvBtn").onclick = () => {
+  if (!sheet) return;
+  const rows = sortRows(filtered());
+  const cols = visibleCols();
+  const q = v => { const s = v == null ? "" : v instanceof Date ? fmt(v) : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const lines = [["Brand", "Filament type", "Color", ...cols.map(c => c.label)].map(q).join(",")];
+  for (const r of rows) lines.push([r._brand, r._type, r._color, ...cols.map(c => c.pct && isNum(r[c.key]) ? +(r[c.key] * 100).toFixed(2) : r[c.key])].map(q).join(","));
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" }));
+  a.download = `${sheet.name.replace(/[^\w-]+/g, "_")}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+
+/* ---------- loading ---------- */
+const pick = () => $("#fileInput").click();
+$("#openBtn").onclick = pick;
+$("#dropOpen").onclick = pick;
+$("#fileInput").onchange = e => { const f = e.target.files[0]; if (f) loadFile(f); e.target.value = ""; };
+let dragDepth = 0;
+addEventListener("dragenter", e => { e.preventDefault(); dragDepth++; $("#drop").classList.add("on"); });
+addEventListener("dragleave", () => { if (--dragDepth <= 0 && SHEETS.length) $("#drop").classList.remove("on"); });
+addEventListener("dragover", e => e.preventDefault());
+addEventListener("drop", e => {
+  e.preventDefault(); dragDepth = 0;
+  const f = e.dataTransfer.files[0];
+  if (f) loadFile(f); else if (SHEETS.length) $("#drop").classList.remove("on");
+});
+
+async function loadFile(file) {
+  const buf = await file.arrayBuffer();
+  if (load(buf, file.name)) idb.put({ name: file.name, buf, at: Date.now() });
+}
+function load(buf, name) {
+  try {
+    const sheets = parseWorkbook(buf);
+    if (!sheets.length) throw new Error("No sheet with a “Brand” column was found.");
+    SHEETS = sheets;
+    $("#fileName").textContent = name;
+    $("#fileName").title = name;
+    $("#sheetSel").innerHTML = sheets.map(s => `<option>${esc(s.name)}</option>`).join("");
+    $("#drop").classList.remove("on");
+    selectSheet(sheets.some(s => s.name === state.sheet) ? state.sheet : sheets[0].name);
+    return true;
+  } catch (err) {
+    $("#err").textContent = "Could not read that file: " + err.message;
+    $("#drop").classList.add("on");
+    return false;
+  }
+}
+function selectSheet(name) {
+  sheet = SHEETS.find(s => s.name === name);
+  state.sheet = name;
+  $("#sheetSel").value = name;
+  // facet values from another sheet would filter everything out
+  for (const f in FACETS) state[f] = state[f].filter(v => sheet.rows.some(r => FACETS[f](r) === v));
+  if (state.sort && state.sort.key !== "_name" && !colByKey(state.sort.key)) state.sort = null;
+  $("#q").value = state.q;
+  save(); render();
+}
+
+(async () => {
+  if (typeof XLSX === "undefined" || typeof Chart === "undefined") {
+    $("#err").textContent = "The page needs cdnjs.cloudflare.com for its two libraries (SheetJS, Chart.js): no connection?";
+  }
+  // ?xlsx=URL loads a served copy (python -m http.server in projects/Print-Lab: ?xlsx=../inputs/mytechfun/FILE.xlsx)
+  const src = new URLSearchParams(location.search).get("xlsx");
+  if (src) {
+    try {
+      const r = await fetch(src);
+      if (!r.ok) throw new Error(r.status + " " + r.statusText);
+      if (load(await r.arrayBuffer(), decodeURIComponent(src.split("/").pop()))) return;
+    } catch (err) { $("#err").textContent = `Could not fetch ${src}: ${err.message}`; }
+  }
+  const last = await idb.get();
+  if (last && last.buf && load(last.buf, last.name)) return;
+  $("#drop").classList.add("on");
+})();
+</script>
+</body>
+</html>
