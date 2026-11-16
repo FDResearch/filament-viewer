@@ -513,14 +513,16 @@ function creepHorizon(sheet, rows) {
   const later = (common || []).filter(d => d > 0);
   return { day: later.length ? Math.max(...later) : null, withData, without: rows.length - withData };
 }
-function computeCreep(sheet, rows) {
+// rows set the horizon; fill (default: the same rows) get the values, every other row none
+function computeCreep(sheet, rows, fill = rows) {
   const h = creepHorizon(sheet, rows);
   const mode = state.creepMode === "last" || h.day == null ? "last" : "common";
   const byDay = Object.fromEntries(sheet.creepCols.map(c => [c.creepDay, c.key]));
   for (const r of sheet.rows) r._creepMm = r._creepPct = r._creepDay = null; // rows filtered out keep no stale value
-  for (const r of rows) {
+  for (const r of fill) {
     const days = creepDays(sheet, r);
     if (days.length < 2) continue;
+    if (mode === "common" && !days.includes(h.day)) continue;
     const d = mode === "common" ? h.day : Math.max(...days);
     const v0 = r[byDay[0]], vd = r[byDay[d]];
     if (!isNum(v0) || !isNum(vd)) continue;
@@ -864,16 +866,22 @@ function radarKeys() {
   return keys.length >= 3 ? keys : nc.slice(0, 6).map(c => c.key);
 }
 function renderRadar(rows) {
-  const keys = radarKeys(), cols = keys.map(colByKey).filter(Boolean);
+  const cols0 = radarKeys().map(colByKey).filter(Boolean);
   let list = sheet.rows.filter(r => state.pins.includes(r._id));
   let note = "";
   if (!list.length) {
-    const k = cols[0] && cols[0].key;
-    const lb = cols[0] && cols[0].lowerBetter;
+    const k = cols0[0] && cols0[0].key;
+    const lb = cols0[0] && cols0[0].lowerBetter;
     list = rows.filter(r => isNum(r[k])).sort((a, b) => lb ? a[k] - b[k] : b[k] - a[k]).slice(0, 4);
-    note = `No pinned rows: showing the top 4 by ${cols[0] ? cols[0].label : ""}. Pin rows with ☆ to compare them.`;
+    note = `No pinned rows: showing the top 4 by ${cols0[0] ? cols0[0].label : ""}. Pin rows with ☆ to compare them.`;
   }
   list = list.slice(0, 10);
+  // Computed creep for the radar: the horizon of the rows drawn (pinned rows may be outside the filter),
+  // the value for every row of the sheet that has that day, so the rank is among all of them.
+  // The table's values are put back afterwards.
+  const tableCreep = creepState;
+  creepState = computeCreep(sheet, list, sheet.rows);
+  const cols = radarKeys().map(colByKey).filter(Boolean);
   // percentile among every row of the sheet, flipped where lower is better, so outward is always better
   const ranks = heatRanks(sheet.rows, cols);
   const datasets = list.map((r, i) => {
@@ -881,6 +889,8 @@ function renderRadar(rows) {
     return { label: r._name + (r._color ? ` (${r._color})` : ""), data: cols.map(c => ranks[c.key] ? (ranks[c.key](r[c.key]) ?? null) : null),
       raw: cols.map(c => r[c.key]), borderColor: col, backgroundColor: col + "26", pointBackgroundColor: col, borderWidth: 2, spanGaps: true };
   });
+  creepState = tableCreep;
+  computeCreep(sheet, rows);
   $("#rstat").innerHTML = note || `<b>${list.length}</b> pinned · each axis is the rank among all ${sheet.rows.length} rows (outward = better; lower-is-better axes are flipped)`;
   chart("cRadar", {
     type: "radar", data: { labels: cols.map(c => c.label), datasets },
